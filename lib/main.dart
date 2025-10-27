@@ -16,7 +16,7 @@ const String _kActiveProfileKey = 'petcare_active_profile_v1';
 const String _kLegacyPetsKey = 'petcare_pets_v1'; // from Stage 2
 
 /// -----------------------------
-/// Pet model (same as Stage 2)
+/// Pet model (Stage 4: add avatar fields)
 /// -----------------------------
 class Pet {
   final String id;
@@ -29,6 +29,11 @@ class Pet {
   DateTime lastFed;
   DateTime createdAt;
 
+  // new customization fields
+  // stored as int color value and a small emoji string
+  int avatarColorValue;
+  String avatarEmoji;
+
   Pet({
     required this.id,
     required this.name,
@@ -39,6 +44,8 @@ class Pet {
     required this.health,
     required this.lastFed,
     required this.createdAt,
+    required this.avatarColorValue,
+    required this.avatarEmoji,
   });
 
   factory Pet.createSeed({required String name, required String type}) {
@@ -53,10 +60,13 @@ class Pet {
       health: 90,
       lastFed: now.subtract(Duration(hours: 4)),
       createdAt: now,
+      avatarColorValue: Colors.primaries[(now.millisecondsSinceEpoch ~/ 1000) % Colors.primaries.length].value,
+      avatarEmoji: _defaultEmojiForType(type),
     );
   }
 
   factory Pet.fromJson(Map<String, dynamic> j) {
+    // backwards-compatible: avatar fields may be missing
     return Pet(
       id: j['id'] as String,
       name: j['name'] as String,
@@ -67,6 +77,10 @@ class Pet {
       health: (j['health'] as num).toInt(),
       lastFed: DateTime.parse(j['lastFed'] as String),
       createdAt: DateTime.parse(j['createdAt'] as String),
+      avatarColorValue: j.containsKey('avatarColorValue')
+          ? (j['avatarColorValue'] as num).toInt()
+          : Colors.blue.value,
+      avatarEmoji: j.containsKey('avatarEmoji') ? (j['avatarEmoji'] as String) : _defaultEmojiForType(j['type'] as String),
     );
   }
 
@@ -80,6 +94,8 @@ class Pet {
         'health': health,
         'lastFed': lastFed.toIso8601String(),
         'createdAt': createdAt.toIso8601String(),
+        'avatarColorValue': avatarColorValue,
+        'avatarEmoji': avatarEmoji,
       };
 
   void _clampAll() {
@@ -119,6 +135,22 @@ class Pet {
     mood -= (hours * 1);
     if (hunger > 80) health -= (hours * 1);
     _clampAll();
+  }
+}
+
+/// helper: choose an emoji based on type
+String _defaultEmojiForType(String type) {
+  switch (type.toLowerCase()) {
+    case 'dog':
+      return '🐶';
+    case 'cat':
+      return '🐱';
+    case 'bunny':
+      return '🐰';
+    case 'hamster':
+      return '🐹';
+    default:
+      return '🐾';
   }
 }
 
@@ -179,7 +211,7 @@ class PetCareApp extends StatelessWidget {
 }
 
 /// -----------------------------
-/// HomeScreen: manages profiles + pets per-profile
+/// HomeScreen: manages profiles + pets per-profile + customization UI
 /// -----------------------------
 class HomeScreen extends StatefulWidget {
   @override
@@ -196,6 +228,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // pets for the active profile
   List<Pet> pets = [];
+
+  // customization palettes
+  final List<Color> _palette = [
+    Colors.purple,
+    Colors.blue,
+    Colors.teal,
+    Colors.green,
+    Colors.orange,
+    Colors.pink,
+    Colors.indigo,
+    Colors.brown,
+  ];
+
+  final List<String> _emojiChoices = ['🐶', '🐱', '🐰', '🐹', '🐾', '🦊', '🐻', '🐼'];
 
   @override
   void initState() {
@@ -345,8 +391,21 @@ class _HomeScreenState extends State<HomeScreen> {
     _showSnack('Removed profile "${toRemove.name}"');
   }
 
-  Future<void> _addPet(String name, String type) async {
-    final pet = Pet.createSeed(name: name.isEmpty ? 'Unnamed' : name, type: type);
+  Future<void> _addPet(String name, String type, {int? avatarColorValue, String? avatarEmoji}) async {
+    final now = DateTime.now();
+    final pet = Pet(
+      id: 'pet_${now.millisecondsSinceEpoch}',
+      name: name.isEmpty ? 'Unnamed' : name,
+      type: type,
+      mood: 70,
+      energy: 80,
+      hunger: 20,
+      health: 90,
+      lastFed: now.subtract(Duration(hours: 4)),
+      createdAt: now,
+      avatarColorValue: avatarColorValue ?? _palette[0].value,
+      avatarEmoji: avatarEmoji ?? _defaultEmojiForType(type),
+    );
     pets.add(pet);
     await _savePetsForActiveProfile();
     setState(() {});
@@ -484,7 +543,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 );
                                 if (ok == true) {
-                                  // if removing last profile, confirm
                                   await _deleteProfile(p.id);
                                   Navigator.of(context).pop(); // close sheet to refresh gracefully
                                   _showManageProfilesSheet(); // reopen to show updated list
@@ -510,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
   }
 
-  // Adopt dialog now links pet to active profile
+  // Adopt dialog now allows picking emoji & color
   Future<void> _showAdoptDialog() async {
     if (activeProfileId == null) {
       _showSnack('Create a profile first');
@@ -518,49 +576,98 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     String name = '';
     String selectedType = 'Dog';
+    Color selectedColor = _palette.first;
+    String selectedEmoji = _defaultEmojiForType(selectedType);
+
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Adopt a pet'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(decoration: InputDecoration(labelText: 'Pet name'), onChanged: (v) => name = v),
-            SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: selectedType,
-              items: ['Dog', 'Cat', 'Bunny', 'Hamster']
-                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                  .toList(),
-              onChanged: (v) => selectedType = v ?? 'Dog',
-              decoration: InputDecoration(labelText: 'Pet type'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text('Adopt a pet'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(decoration: InputDecoration(labelText: 'Pet name'), onChanged: (v) => name = v),
+                SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedType,
+                  items: ['Dog', 'Cat', 'Bunny', 'Hamster']
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                      .toList(),
+                  onChanged: (v) {
+                    selectedType = v ?? selectedType;
+                    // update emoji default with type
+                    selectedEmoji = _defaultEmojiForType(selectedType);
+                    setLocal(() {});
+                  },
+                  decoration: InputDecoration(labelText: 'Pet type'),
+                ),
+                SizedBox(height: 12),
+                Align(alignment: Alignment.centerLeft, child: Text('Choose avatar emoji', style: TextStyle(fontWeight: FontWeight.w600))),
+                SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _emojiChoices.map((e) {
+                    final isSelected = e == selectedEmoji;
+                    return ChoiceChip(
+                      label: Text(e, style: TextStyle(fontSize: 20)),
+                      selected: isSelected,
+                      onSelected: (_) => setLocal(() => selectedEmoji = e),
+                    );
+                  }).toList(),
+                ),
+                SizedBox(height: 12),
+                Align(alignment: Alignment.centerLeft, child: Text('Choose avatar color', style: TextStyle(fontWeight: FontWeight.w600))),
+                SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: _palette.map((c) {
+                    final isSelected = c.value == selectedColor.value;
+                    return GestureDetector(
+                      onTap: () => setLocal(() => selectedColor = c),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: c,
+                          shape: BoxShape.circle,
+                          border: isSelected ? Border.all(color: Colors.black26, width: 3) : null,
+                        ),
+                        child: isSelected ? Icon(Icons.check, color: useWhiteForeground(c) ? Colors.white : Colors.black) : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _addPet(name, selectedType, avatarColorValue: selectedColor.value, avatarEmoji: selectedEmoji);
+              },
+              child: Text('Adopt'),
+            )
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _addPet(name, selectedType);
-            },
-            child: Text('Adopt'),
-          )
-        ],
       ),
     );
   }
 
-  // Pet detail sheet (same UX as Stage 2), but persists per-profile
+  // Pet detail sheet with Edit button
   void _openPetDetail(Pet pet) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.64,
+        initialChildSize: 0.7,
         minChildSize: 0.36,
-        maxChildSize: 0.9,
+        maxChildSize: 0.95,
         builder: (_, ctl) {
           return Container(
             decoration: BoxDecoration(
@@ -575,7 +682,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(height: 12),
                 Row(
                   children: [
-                    CircleAvatar(radius: 36, backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.14), child: Icon(Icons.pets, size: 36, color: Theme.of(context).colorScheme.primary)),
+                    CircleAvatar(radius: 36, backgroundColor: Color(pet.avatarColorValue).withOpacity(0.18), child: Text(pet.avatarEmoji, style: TextStyle(fontSize: 28))),
                     SizedBox(width: 12),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -583,6 +690,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         SizedBox(height: 4),
                         Text(pet.type, style: TextStyle(color: Colors.black54)),
                       ]),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.edit),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _showEditPetDialog(pet);
+                      },
                     ),
                     IconButton(
                       icon: Icon(Icons.delete_outline),
@@ -676,7 +790,90 @@ class _HomeScreenState extends State<HomeScreen> {
     return p.name;
   }
 
-  // Helper UI bits: stat row and pet card
+  // Edit pet dialog: change name, emoji, color
+  Future<void> _showEditPetDialog(Pet pet) async {
+    String name = pet.name;
+    String selectedEmoji = pet.avatarEmoji;
+    Color selectedColor = Color(pet.avatarColorValue);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setLocal) {
+        return AlertDialog(
+          title: Text('Edit ${pet.name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(decoration: InputDecoration(labelText: 'Pet name'), controller: TextEditingController(text: name), onChanged: (v) => name = v),
+                SizedBox(height: 12),
+                Align(alignment: Alignment.centerLeft, child: Text('Choose emoji', style: TextStyle(fontWeight: FontWeight.w600))),
+                SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _emojiChoices.map((e) {
+                    final isSelected = e == selectedEmoji;
+                    return ChoiceChip(
+                      label: Text(e, style: TextStyle(fontSize: 20)),
+                      selected: isSelected,
+                      onSelected: (_) => setLocal(() => selectedEmoji = e),
+                    );
+                  }).toList(),
+                ),
+                SizedBox(height: 12),
+                                Align(alignment: Alignment.centerLeft, child: Text('Choose avatar color', style: TextStyle(fontWeight: FontWeight.w600))),
+                SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: _palette.map((c) {
+                    final isSelected = c.value == selectedColor.value;
+                    return GestureDetector(
+                      onTap: () => setLocal(() => selectedColor = c),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: c,
+                          shape: BoxShape.circle,
+                          border: isSelected ? Border.all(color: Colors.black26, width: 3) : null,
+                        ),
+                        child: isSelected ? Icon(Icons.check, color: useWhiteForeground(c) ? Colors.white : Colors.black) : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                // apply changes
+                pet.name = name.isEmpty ? pet.name : name;
+                pet.avatarEmoji = selectedEmoji;
+                pet.avatarColorValue = selectedColor.value;
+                _updatePet(pet);
+                Navigator.of(ctx).pop();
+                _showSnack('Updated ${pet.name}');
+              },
+              child: Text('Save'),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  // helper to pick white/black foreground depending on background contrast
+  bool useWhiteForeground(Color backgroundColor, {double bias = 0.0}) {
+    // standard luminance contrast check
+    final double v = (0.299 * backgroundColor.red + 0.587 * backgroundColor.green + 0.114 * backgroundColor.blue) / 255;
+    return v < 0.5 + bias;
+  }
+
+  // Helper UI bits: stat row and pet card (reused)
   Widget _statRow(String label, int value, {String? suffixHint}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,7 +903,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Row(
           children: [
-            CircleAvatar(radius: 28, backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.12), child: Icon(Icons.pets, color: Theme.of(context).colorScheme.primary)),
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: Color(p.avatarColorValue).withOpacity(0.14),
+              child: Text(p.avatarEmoji, style: TextStyle(fontSize: 24)),
+            ),
             SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -747,12 +948,32 @@ class _HomeScreenState extends State<HomeScreen> {
                   p.rest();
                   await _updatePet(p);
                   _showSnack('${p.name} rested');
+                } else if (v == 'edit') {
+                  _showEditPetDialog(p);
+                } else if (v == 'delete') {
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (dctx) => AlertDialog(
+                      title: Text('Remove ${p.name}?'),
+                      content: Text('This will permanently remove the pet from this profile.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: Text('Cancel')),
+                        ElevatedButton(onPressed: () => Navigator.of(dctx).pop(true), child: Text('Remove')),
+                      ],
+                    ),
+                  );
+                  if (ok == true) {
+                    await _deletePet(p.id);
+                  }
                 }
               },
               itemBuilder: (_) => [
                 PopupMenuItem(value: 'feed', child: Text('Feed')),
                 PopupMenuItem(value: 'play', child: Text('Play')),
                 PopupMenuItem(value: 'rest', child: Text('Rest')),
+                PopupMenuDivider(),
+                PopupMenuItem(value: 'edit', child: Text('Edit')),
+                PopupMenuItem(value: 'delete', child: Text('Delete')),
               ],
               child: Icon(Icons.more_vert),
             ),
@@ -818,7 +1039,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(radius: 30, backgroundColor: Colors.white.withOpacity(0.2), child: Icon(Icons.emoji_emotions, color: Colors.white)),
+                        // show active profile initial or placeholder
+                        CircleAvatar(radius: 30, backgroundColor: Colors.white.withOpacity(0.2), child: Text(_activeProfileName().isNotEmpty ? _activeProfileName()[0].toUpperCase() : '?', style: TextStyle(color: Colors.white, fontSize: 24))),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(

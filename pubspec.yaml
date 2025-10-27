@@ -1,5 +1,5 @@
 name: pet_care_app
-description: A minimal Pet Care App (single-file, no assets)
+description: Pet Care App — single-file, no assets (Stage 4)
 publish_to: "none"
 version: 0.1.0
 environment:
@@ -9,6 +9,7 @@ dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.1.0
+  flutter_colorpicker: ^1.0.3
 
 dev_dependencies:
   flutter_test:
