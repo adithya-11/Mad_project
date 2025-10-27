@@ -8,35 +8,15 @@ void main() {
   runApp(PetCareApp());
 }
 
-class PetCareApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Pet Care App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Color(0xFF6C63FF),
-          primary: Color(0xFF6C63FF),
-          secondary: Color(0xFFFFB86B),
-          background: Color(0xFFF6F7FB),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        appBarTheme: AppBarTheme(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.black87,
-          centerTitle: true,
-        ),
-      ),
-      home: HomeScreen(),
-    );
-  }
-}
+/// -----------------------------
+/// Constants / Pref keys
+/// -----------------------------
+const String _kProfilesKey = 'petcare_profiles_v1';
+const String _kActiveProfileKey = 'petcare_active_profile_v1';
+const String _kLegacyPetsKey = 'petcare_pets_v1'; // from Stage 2
 
 /// -----------------------------
-/// Pet model + persistence keys
+/// Pet model (same as Stage 2)
 /// -----------------------------
 class Pet {
   final String id;
@@ -102,7 +82,6 @@ class Pet {
         'createdAt': createdAt.toIso8601String(),
       };
 
-  // simple small helpers to clamp values
   void _clampAll() {
     mood = mood.clamp(0, 100);
     energy = energy.clamp(0, 100);
@@ -111,7 +90,7 @@ class Pet {
   }
 
   void feed() {
-    hunger -= 30; // reduce hunger
+    hunger -= 30;
     mood += 8;
     energy += 10;
     lastFed = DateTime.now();
@@ -132,24 +111,75 @@ class Pet {
     _clampAll();
   }
 
-  // small decay over time (call occasionally)
   void timeTick(Duration elapsed) {
-    // every hour increases hunger slightly and decreases energy
     final hours = elapsed.inHours;
     if (hours <= 0) return;
     hunger += (hours * 2);
     energy -= (hours * 1);
     mood -= (hours * 1);
-    // if starving, health drops
     if (hunger > 80) health -= (hours * 1);
     _clampAll();
   }
 }
 
-const String _kPetsKey = 'petcare_pets_v1';
+/// -----------------------------
+/// Profile model
+/// -----------------------------
+class Profile {
+  final String id;
+  String name;
+  DateTime createdAt;
+
+  Profile({required this.id, required this.name, required this.createdAt});
+
+  factory Profile.create(String name) {
+    final now = DateTime.now();
+    return Profile(id: 'profile_${now.millisecondsSinceEpoch}', name: name, createdAt: now);
+  }
+
+  factory Profile.fromJson(Map<String, dynamic> j) {
+    return Profile(
+      id: j['id'] as String,
+      name: j['name'] as String,
+      createdAt: DateTime.parse(j['createdAt'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'createdAt': createdAt.toIso8601String()};
+}
 
 /// -----------------------------
-/// Home Screen: loads/saves pets
+/// App widget
+/// -----------------------------
+class PetCareApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Pet Care App',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFF6C63FF),
+          primary: Color(0xFF6C63FF),
+          secondary: Color(0xFFFFB86B),
+          background: Color(0xFFF6F7FB),
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+        appBarTheme: AppBarTheme(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.black87,
+          centerTitle: true,
+        ),
+      ),
+      home: HomeScreen(),
+    );
+  }
+}
+
+/// -----------------------------
+/// HomeScreen: manages profiles + pets per-profile
 /// -----------------------------
 class HomeScreen extends StatefulWidget {
   @override
@@ -157,9 +187,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<Pet> pets = [];
-  bool loading = true;
   SharedPreferences? _prefs;
+  bool loading = true;
+
+  // profiles and active profile id
+  List<Profile> profiles = [];
+  String? activeProfileId;
+
+  // pets for the active profile
+  List<Pet> pets = [];
 
   @override
   void initState() {
@@ -169,20 +205,82 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initAndLoad() async {
     _prefs = await SharedPreferences.getInstance();
-    _loadPets();
+    await _maybeMigrateLegacyPets();
+    _loadProfiles();
+    _loadActiveProfile();
+    _loadPetsForActiveProfile();
     setState(() {
       loading = false;
     });
   }
 
-  void _loadPets() {
-    final s = _prefs?.getString(_kPetsKey);
+  /// Migration:
+  /// If there are pets under legacy key (from Stage 2) and no profiles exist,
+  /// create a default profile and move those pets into it.
+  Future<void> _maybeMigrateLegacyPets() async {
+    final lp = _prefs;
+    if (lp == null) return;
+    final legacy = lp.getString(_kLegacyPetsKey);
+    final existingProfiles = lp.getString(_kProfilesKey);
+    if (legacy != null && (existingProfiles == null || existingProfiles.isEmpty)) {
+      try {
+        final list = json.decode(legacy) as List<dynamic>;
+        final movedPets = list.map((e) => Pet.fromJson(e as Map<String, dynamic>)).toList();
+        // create default profile
+        final defaultProfile = Profile.create('You');
+        // save profile list
+        await lp.setString(_kProfilesKey, json.encode([defaultProfile.toJson()]));
+        // set active profile
+        await lp.setString(_kActiveProfileKey, defaultProfile.id);
+        // save pets under new per-profile key
+        final petKey = _petsKeyForProfile(defaultProfile.id);
+        await lp.setString(petKey, json.encode(movedPets.map((p) => p.toJson()).toList()));
+        // remove legacy key
+        await lp.remove(_kLegacyPetsKey);
+      } catch (e) {
+        // ignore parse errors; no migration performed
+      }
+    }
+  }
+
+  void _loadProfiles() {
+    final s = _prefs?.getString(_kProfilesKey);
     if (s == null) {
-      // seed sample pet so UI isn't empty
-      pets = [
-        Pet.createSeed(name: 'Mochi', type: 'Cat'),
-      ];
-      _savePets();
+      profiles = []; // empty until user creates
+      return;
+    }
+    try {
+      final list = json.decode(s) as List<dynamic>;
+      profiles = list.map((e) => Profile.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      profiles = [];
+    }
+  }
+
+  void _loadActiveProfile() {
+    final s = _prefs?.getString(_kActiveProfileKey);
+    if (s == null) {
+      activeProfileId = profiles.isNotEmpty ? profiles.first.id : null;
+      if (activeProfileId != null) _prefs?.setString(_kActiveProfileKey, activeProfileId!);
+      return;
+    }
+    activeProfileId = s;
+    // ensure active exists; if not, reset to first profile if available
+    if (activeProfileId != null && !profiles.any((p) => p.id == activeProfileId)) {
+      activeProfileId = profiles.isNotEmpty ? profiles.first.id : null;
+      if (activeProfileId != null) _prefs?.setString(_kActiveProfileKey, activeProfileId!);
+    }
+  }
+
+  void _loadPetsForActiveProfile() {
+    pets = [];
+    if (activeProfileId == null) return;
+    final key = _petsKeyForProfile(activeProfileId!);
+    final s = _prefs?.getString(key);
+    if (s == null) {
+      // seed a friendly pet for new profile
+      pets = [Pet.createSeed(name: 'Mochi', type: 'Cat')];
+      _savePetsForActiveProfile();
       return;
     }
     try {
@@ -190,48 +288,234 @@ class _HomeScreenState extends State<HomeScreen> {
       pets = list.map((e) => Pet.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       pets = [Pet.createSeed(name: 'Mochi', type: 'Cat')];
-      _savePets();
+      _savePetsForActiveProfile();
     }
   }
 
-  Future<void> _savePets() async {
+  String _petsKeyForProfile(String profileId) => 'pets_for_$profileId';
+
+  Future<void> _saveProfiles() async {
     if (_prefs == null) return;
-    final s = json.encode(pets.map((p) => p.toJson()).toList());
-    await _prefs!.setString(_kPetsKey, s);
+    await _prefs!.setString(_kProfilesKey, json.encode(profiles.map((p) => p.toJson()).toList()));
+  }
+
+  Future<void> _setActiveProfile(String profileId) async {
+    if (_prefs == null) return;
+    activeProfileId = profileId;
+    await _prefs!.setString(_kActiveProfileKey, profileId);
+    _loadPetsForActiveProfile();
+    setState(() {});
+  }
+
+  Future<void> _savePetsForActiveProfile() async {
+    if (_prefs == null || activeProfileId == null) return;
+    final key = _petsKeyForProfile(activeProfileId!);
+    await _prefs!.setString(key, json.encode(pets.map((p) => p.toJson()).toList()));
+  }
+
+  Future<void> _addProfile(String name) async {
+    final p = Profile.create(name.isEmpty ? 'Profile' : name);
+    profiles.add(p);
+    await _saveProfiles();
+    await _setActiveProfile(p.id);
+    _showSnack('Created profile "${p.name}" and switched to it');
+  }
+
+  Future<void> _deleteProfile(String profileId) async {
+    final toRemove = profiles.firstWhere((p) => p.id == profileId, orElse: () => throw StateError('not found'));
+    // remove associated pets key
+    await _prefs?.remove(_petsKeyForProfile(profileId));
+    profiles.removeWhere((p) => p.id == profileId);
+    await _saveProfiles();
+
+    // if removed active, switch to another or null
+    if (activeProfileId == profileId) {
+      if (profiles.isNotEmpty) {
+        await _setActiveProfile(profiles.first.id);
+      } else {
+        activeProfileId = null;
+        await _prefs?.remove(_kActiveProfileKey);
+        pets = [];
+        setState(() {});
+      }
+    } else {
+      setState(() {});
+    }
+
+    _showSnack('Removed profile "${toRemove.name}"');
   }
 
   Future<void> _addPet(String name, String type) async {
     final pet = Pet.createSeed(name: name.isEmpty ? 'Unnamed' : name, type: type);
-    setState(() {
-      pets.add(pet);
-    });
-    await _savePets();
-    _showSnack('Adopted ${pet.name} the ${pet.type}!');
+    pets.add(pet);
+    await _savePetsForActiveProfile();
+    setState(() {});
+    _showSnack('Adopted ${pet.name}');
   }
 
   Future<void> _deletePet(String id) async {
-    setState(() {
-      pets.removeWhere((p) => p.id == id);
-    });
-    await _savePets();
-    _showSnack('Pet removed');
+    pets.removeWhere((p) => p.id == id);
+    await _savePetsForActiveProfile();
+    setState(() {});
   }
 
   Future<void> _updatePet(Pet pet) async {
-    final index = pets.indexWhere((p) => p.id == pet.id);
-    if (index >= 0) {
-      pets[index] = pet;
-      await _savePets();
+    final idx = pets.indexWhere((p) => p.id == pet.id);
+    if (idx >= 0) {
+      pets[idx] = pet;
+      await _savePetsForActiveProfile();
       setState(() {});
     }
   }
 
-  void _showSnack(String text) {
+  void _showSnack(String txt) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(txt)));
   }
 
+  // UI: create profile dialog
+  Future<void> _showCreateProfileDialog() async {
+    String name = '';
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Create profile'),
+        content: TextField(
+          decoration: InputDecoration(labelText: 'Profile name'),
+          onChanged: (v) => name = v,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _addProfile(name.isEmpty ? 'Profile' : name);
+            },
+            child: Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // UI: choose/switch profile menu
+  Widget _profileSelector() {
+    final active = profiles.firstWhere((p) => p.id == activeProfileId, orElse: () => Profile(id: 'none', name: 'No profile', createdAt: DateTime.now()));
+    return PopupMenuButton<String>(
+      tooltip: 'Profiles',
+      icon: CircleAvatar(
+        radius: 16,
+        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+        child: Text(active.name.isNotEmpty ? active.name[0].toUpperCase() : '?', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+      ),
+      itemBuilder: (_) {
+        final items = <PopupMenuEntry<String>>[];
+        if (profiles.isEmpty) {
+          items.add(PopupMenuItem(child: Text('No profiles yet'), value: 'noop'));
+        } else {
+          for (final p in profiles) {
+            items.add(PopupMenuItem(
+              value: p.id,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(p.name),
+                  if (p.id == activeProfileId) Icon(Icons.check, size: 18, color: Theme.of(context).colorScheme.primary),
+                ],
+              ),
+            ));
+          }
+        }
+        items.add(const PopupMenuDivider());
+        items.add(PopupMenuItem(value: 'create', child: Text('Create profile')));
+        if (profiles.isNotEmpty) items.add(PopupMenuItem(value: 'manage', child: Text('Manage profiles')));
+        return items;
+      },
+      onSelected: (v) {
+        if (v == 'create') {
+          _showCreateProfileDialog();
+        } else if (v == 'manage') {
+          _showManageProfilesSheet();
+        } else if (v == 'noop') {
+          // do nothing
+        } else {
+          _setActiveProfile(v);
+        }
+      },
+    );
+  }
+
+  Future<void> _showManageProfilesSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.all(12),
+        height: 320,
+        child: Column(
+          children: [
+            Text('Manage profiles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            SizedBox(height: 12),
+            Expanded(
+              child: profiles.isEmpty
+                  ? Center(child: Text('No profiles'))
+                  : ListView.builder(
+                      itemCount: profiles.length,
+                      itemBuilder: (_, i) {
+                        final p = profiles[i];
+                        final isActive = p.id == activeProfileId;
+                        return ListTile(
+                          leading: CircleAvatar(child: Text(p.name.isNotEmpty ? p.name[0].toUpperCase() : '?')),
+                          title: Text(p.name),
+                          subtitle: Text('Created ${_formatDate(p.createdAt)}'),
+                          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                            if (isActive) Padding(padding: EdgeInsets.only(right: 8), child: Chip(label: Text('Active'))),
+                            IconButton(
+                              icon: Icon(Icons.delete_outline),
+                              onPressed: () async {
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dctx) => AlertDialog(
+                                    title: Text('Remove profile "${p.name}"?'),
+                                    content: Text('This will delete the profile and its local pets.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: Text('Cancel')),
+                                      ElevatedButton(onPressed: () => Navigator.of(dctx).pop(true), child: Text('Remove')),
+                                    ],
+                                  ),
+                                );
+                                if (ok == true) {
+                                  // if removing last profile, confirm
+                                  await _deleteProfile(p.id);
+                                  Navigator.of(context).pop(); // close sheet to refresh gracefully
+                                  _showManageProfilesSheet(); // reopen to show updated list
+                                }
+                              },
+                            ),
+                          ]),
+                          onTap: () {
+                            _setActiveProfile(p.id);
+                            Navigator.of(context).pop();
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
+  // Adopt dialog now links pet to active profile
   Future<void> _showAdoptDialog() async {
+    if (activeProfileId == null) {
+      _showSnack('Create a profile first');
+      return;
+    }
     String name = '';
     String selectedType = 'Dog';
     await showDialog(
@@ -257,8 +541,8 @@ class _HomeScreenState extends State<HomeScreen> {
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              _addPet(name, selectedType);
               Navigator.of(ctx).pop();
+              _addPet(name, selectedType);
             },
             child: Text('Adopt'),
           )
@@ -267,7 +551,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Open pet detail sheet
+  // Pet detail sheet (same UX as Stage 2), but persists per-profile
   void _openPetDetail(Pet pet) {
     showModalBottomSheet(
       context: context,
@@ -287,9 +571,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListView(
               controller: ctl,
               children: [
-                Center(
-                  child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(4))),
-                ),
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(4)))),
                 SizedBox(height: 12),
                 Row(
                   children: [
@@ -316,7 +598,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(height: 8),
                 _statRow('Energy', pet.energy),
                 SizedBox(height: 8),
-                _statRow('Hunger', 100 - pet.hunger, suffixHint: '(fullness)'), // show fullness
+                _statRow('Hunger', 100 - pet.hunger, suffixHint: '(fullness)'),
                 SizedBox(height: 8),
                 _statRow('Health', pet.health),
                 SizedBox(height: 16),
@@ -331,7 +613,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         onPressed: () async {
                           pet.feed();
                           await _updatePet(pet);
-                          setState(() {});
                           _showSnack('Fed ${pet.name}');
                         },
                       ),
@@ -344,7 +625,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         onPressed: () async {
                           pet.play();
                           await _updatePet(pet);
-                          setState(() {});
                           _showSnack('Played with ${pet.name}');
                         },
                       ),
@@ -357,7 +637,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         onPressed: () async {
                           pet.rest();
                           await _updatePet(pet);
-                          setState(() {});
                           _showSnack('${pet.name} is resting');
                         },
                       ),
@@ -365,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 SizedBox(height: 18),
-                Text('Tip: Actions update the on-device saved state. Stage 3 will add user profiles and Stage 6 will add richer interactions & animations.', style: TextStyle(color: Colors.black54)),
+                Text('Profile: ${_activeProfileName()}', style: TextStyle(color: Colors.black54)),
                 SizedBox(height: 18),
               ],
             ),
@@ -380,7 +659,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Remove ${pet.name}?'),
-        content: Text('This will permanently remove the pet from local storage.'),
+        content: Text('This will permanently remove the pet from this profile.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('Cancel')),
           ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text('Remove')),
@@ -389,18 +668,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (ok == true) {
       await _deletePet(pet.id);
-      setState(() {});
     }
   }
 
-  String _formatRelative(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+  String _activeProfileName() {
+    final p = profiles.firstWhere((p) => p.id == activeProfileId, orElse: () => Profile(id: 'none', name: 'No profile', createdAt: DateTime.now()));
+    return p.name;
   }
 
+  // Helper UI bits: stat row and pet card
   Widget _statRow(String label, int value, {String? suffixHint}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,14 +686,13 @@ class _HomeScreenState extends State<HomeScreen> {
           if (suffixHint != null) Text(suffixHint, style: TextStyle(color: Colors.black45, fontSize: 12)),
         ]),
         SizedBox(height: 6),
-        LinearProgressIndicator(value: value / 100.0, minHeight: 8),
+        LinearProgressIndicator(value: (value.clamp(0, 100)) / 100.0, minHeight: 8),
         SizedBox(height: 6),
         Text('$value / 100', style: TextStyle(color: Colors.black54, fontSize: 12)),
       ],
     );
   }
 
-  // quick compact pet card for list
   Widget _petCard(Pet p) {
     return GestureDetector(
       onTap: () => _openPetDetail(p),
@@ -487,7 +762,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // main UI build
+  // helper to format last-fed time nicely
+  String _formatRelative(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    // older: show date
+    return '${dt.year}-${dt.month.toString().padLeft(2,'0')}-${dt.day.toString().padLeft(2,'0')}';
+  }
+
+  // UI build
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -497,15 +784,17 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text('Pet Care App'),
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(icon: Icon(Icons.refresh_rounded), onPressed: () {
-            // manual small "tick" to simulate time passing 1 hour
-            for (var p in pets) {
-              p.timeTick(Duration(hours: 1));
-            }
-            _savePets();
-            setState(() {});
-            _showSnack('Simulated 1 hour tick for all pets');
-          }),
+          IconButton(
+            icon: Icon(Icons.refresh_rounded),
+            onPressed: () {
+              // simulate 1 hour for pets
+              for (var p in pets) p.timeTick(Duration(hours: 1));
+              _savePetsForActiveProfile();
+              setState(() {});
+              _showSnack('Simulated 1 hour tick for this profile');
+            },
+          ),
+          _profileSelector(),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -514,7 +803,7 @@ class _HomeScreenState extends State<HomeScreen> {
         label: Text('Adopt'),
       ),
       body: SafeArea(
-        minimum: const EdgeInsets.all(16),
+        minimum: EdgeInsets.all(16),
         child: loading
             ? Center(child: CircularProgressIndicator())
             : Column(
@@ -531,12 +820,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         CircleAvatar(radius: 30, backgroundColor: Colors.white.withOpacity(0.2), child: Icon(Icons.emoji_emotions, color: Colors.white)),
                         SizedBox(width: 12),
-                        Expanded(child: Text('Welcome back! ${pets.isEmpty ? 'No pets yet' : 'You have ${pets.length} pet(s)'}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+                        Expanded(
+                          child: Text(
+                            activeProfileId == null ? 'No profile — create one' : 'Profile: ${_activeProfileName()} · ${pets.length} pet(s)',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                          ),
+                        ),
                         TextButton.icon(
                           onPressed: () {
-                            // quick backup/export to console (for dev)
+                            // quick export for active profile
                             final s = json.encode(pets.map((p) => p.toJson()).toList());
-                            showDialog(context: context, builder: (_) => AlertDialog(title: Text('Local JSON snapshot'), content: SingleChildScrollView(child: SelectableText(s)), actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Close'))]));
+                            showDialog(context: context, builder: (_) => AlertDialog(title: Text('Profile JSON snapshot'), content: SingleChildScrollView(child: SelectableText(s)), actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Close'))]));
                           },
                           icon: Icon(Icons.share, color: Colors.white),
                           label: Text('Export', style: TextStyle(color: Colors.white)),
@@ -546,12 +840,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   SizedBox(height: 14),
                   Expanded(
-                    child: pets.isEmpty
-                        ? Center(child: Text('No pets yet — adopt one using the + button', style: TextStyle(color: Colors.black54)))
-                        : ListView.builder(
-                            itemCount: pets.length,
-                            itemBuilder: (_, i) => _petCard(pets[i]),
-                          ),
+                    child: activeProfileId == null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('No profile yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                                SizedBox(height: 12),
+                                ElevatedButton.icon(onPressed: _showCreateProfileDialog, icon: Icon(Icons.add), label: Text('Create profile')),
+                              ],
+                            ),
+                          )
+                        : pets.isEmpty
+                            ? Center(child: Text('No pets — adopt one using the + button', style: TextStyle(color: Colors.black54)))
+                            : ListView.builder(itemCount: pets.length, itemBuilder: (_, i) => _petCard(pets[i])),
                   ),
                 ],
               ),

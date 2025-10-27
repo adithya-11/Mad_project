@@ -1,5 +1,5 @@
 name: pet_care_app
-description: A minimal Pet Care App scaffold (Stage 2) — single file, no assets.
+description: A minimal Pet Care App (single-file, no assets)
 publish_to: "none"
 version: 0.1.0
 environment:
