@@ -1,0 +1,11 @@
+=> Challenge: Managing complex state across multiple pets and profiles, including reminders, health logs, and in-app economy.
+AI Usage: Leveraged AI-assisted code generation and suggestions to structure state management and JSON persistence efficiently.
+
+=> Challenge: Implementing intuitive, user-friendly UI flows for adoption, profile switching, and pet management.
+AI Usage: Utilized AI-based design pattern recommendations to modularize UI components and optimize widget responsiveness.
+
+=> Challenge: Creating dynamic pet state updates (mood, energy, health) with real-time feedback while ensuring data consistency.
+AI Usage: Used AI-assisted logic simplification to develop smooth state clamping and transitions, avoiding bugs.
+
+=> Challenge: Handling persistence and complex data serialization across profiles, pets, reminders, and health logs.
+AI Usage: Applied AI-generated parsers and serializers to unify data handling and reduce manual serialization errors.
