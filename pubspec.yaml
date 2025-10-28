@@ -1,19 +1,23 @@
 name: pet_care_app
-description: Pet Care App — single-file, no assets (Stage 4)
+description: A fun, interactive virtual pet care app.
 publish_to: "none"
-version: 0.1.0
+
+version: 1.0.0+1
+
 environment:
-  sdk: ">=2.18.0 <4.0.0"
+  sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  shared_preferences: ^2.1.0
-  flutter_colorpicker: ^1.0.3
+  shared_preferences: ^2.1.1
+  intl: ^0.18.0
+  cupertino_icons: ^1.0.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^2.0.1
 
 flutter:
   uses-material-design: true
