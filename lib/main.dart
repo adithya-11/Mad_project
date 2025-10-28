@@ -1,5 +1,4 @@
 // lib/main.dart
-// Stage 8+9 — notifications removed; reminders stored in-app (no native plugins)
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -19,29 +18,15 @@ void main() async {
 const String _kProfilesKey = 'petcare_profiles_v1';
 const String _kActiveProfileKey = 'petcare_active_profile_v1';
 const String _kLegacyPetsKey = 'petcare_pets_v1';
-<<<<<<< HEAD
 const String _kReminderKeySuffix = '_reminders_v1'; // persisted map petId -> "HH:mm"
 const String _kNotifIdMapKey = 'notif_id_map_v1'; // kept for compatibility but unused here
-=======
-const String _kReminderKeySuffix =
-    '_reminders_v1'; // persisted map petId -> "HH:mm"
-const String _kNotifIdMapKey =
-    'notif_id_map_v1'; // kept for compatibility but unused here
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
 
 /// -----------------------------
 /// Small helper: white/black foreground contrast
 /// -----------------------------
 bool useWhiteForeground(Color backgroundColor, {double bias = 0.0}) {
-<<<<<<< HEAD
   final double v =
       (0.299 * backgroundColor.red + 0.587 * backgroundColor.green + 0.114 * backgroundColor.blue) / 255;
-=======
-  final double v = (0.299 * backgroundColor.red +
-          0.587 * backgroundColor.green +
-          0.114 * backgroundColor.blue) /
-      255;
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
   return v < 0.5 + bias;
 }
 
@@ -104,12 +89,8 @@ class Pet {
       health: (j['health'] as num).toInt(),
       lastFed: DateTime.parse(j['lastFed'] as String),
       createdAt: DateTime.parse(j['createdAt'] as String),
-      avatarColorValue: j.containsKey('avatarColorValue')
-          ? (j['avatarColorValue'] as num).toInt()
-          : Colors.blue.value,
-      avatarEmoji: j.containsKey('avatarEmoji')
-          ? (j['avatarEmoji'] as String)
-          : _defaultEmojiForType(j['type'] as String),
+      avatarColorValue: j.containsKey('avatarColorValue') ? (j['avatarColorValue'] as num).toInt() : Colors.blue.value,
+      avatarEmoji: j.containsKey('avatarEmoji') ? (j['avatarEmoji'] as String) : _defaultEmojiForType(j['type'] as String),
     );
   }
 
@@ -191,10 +172,7 @@ class Profile {
 
   factory Profile.create(String name) {
     final now = DateTime.now();
-    return Profile(
-        id: 'profile_${now.millisecondsSinceEpoch}',
-        name: name,
-        createdAt: now);
+    return Profile(id: 'profile_${now.millisecondsSinceEpoch}', name: name, createdAt: now);
   }
 
   factory Profile.fromJson(Map<String, dynamic> j) {
@@ -205,8 +183,7 @@ class Profile {
     );
   }
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'name': name, 'createdAt': createdAt.toIso8601String()};
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'createdAt': createdAt.toIso8601String()};
 }
 
 /// -----------------------------
@@ -216,7 +193,7 @@ class PetCareApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Pet Care App (No Native Notifications)',
+      title: 'Pet Care App',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF6C63FF)),
         useMaterial3: true,
@@ -262,16 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Colors.brown,
   ];
 
-  final List<String> _emojiChoices = [
-    '🐶',
-    '🐱',
-    '🐰',
-    '🐹',
-    '🐾',
-    '🦊',
-    '🐻',
-    '🐼'
-  ];
+  final List<String> _emojiChoices = ['🐶', '🐱', '🐰', '🐹', '🐾', '🦊', '🐻', '🐼'];
 
   @override
   void initState() {
@@ -305,19 +273,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (lp == null) return;
     final legacy = lp.getString(_kLegacyPetsKey);
     final existingProfiles = lp.getString(_kProfilesKey);
-    if (legacy != null &&
-        (existingProfiles == null || existingProfiles.isEmpty)) {
+    if (legacy != null && (existingProfiles == null || existingProfiles.isEmpty)) {
       try {
         final list = json.decode(legacy) as List<dynamic>;
-        final movedPets =
-            list.map((e) => Pet.fromJson(e as Map<String, dynamic>)).toList();
+        final movedPets = list.map((e) => Pet.fromJson(e as Map<String, dynamic>)).toList();
         final defaultProfile = Profile.create('You');
-        await lp.setString(
-            _kProfilesKey, json.encode([defaultProfile.toJson()]));
+        await lp.setString(_kProfilesKey, json.encode([defaultProfile.toJson()]));
         await lp.setString(_kActiveProfileKey, defaultProfile.id);
         final petKey = _petsKeyForProfile(defaultProfile.id);
-        await lp.setString(
-            petKey, json.encode(movedPets.map((p) => p.toJson()).toList()));
+        await lp.setString(petKey, json.encode(movedPets.map((p) => p.toJson()).toList()));
         await lp.remove(_kLegacyPetsKey);
       } catch (e) {
         // ignore parse errors
@@ -327,11 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _startSimTimer() {
     // simulate timeTick every minute (for demo). Adjust as needed.
-<<<<<<< HEAD
     _simTimer = Timer.periodic(Duration(minutes: 1), (_) {
-=======
-    simTimer = Timer.periodic(Duration(minutes: 1), () {
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
       for (var p in pets) {
         p.timeTick(Duration(hours: 1));
       }
@@ -348,8 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     try {
       final list = json.decode(s) as List<dynamic>;
-      profiles =
-          list.map((e) => Profile.fromJson(e as Map<String, dynamic>)).toList();
+      profiles = list.map((e) => Profile.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       profiles = [];
     }
@@ -359,8 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final s = _prefs?.getString(_kActiveProfileKey);
     if (s == null) {
       activeProfileId = profiles.isNotEmpty ? profiles.first.id : null;
-      if (activeProfileId != null)
-        _prefs?.setString(_kActiveProfileKey, activeProfileId!);
+      if (activeProfileId != null) _prefs?.setString(_kActiveProfileKey, activeProfileId!);
       return;
     }
     active_profileAssign(s);
@@ -368,11 +326,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void active_profileAssign(String s) {
     activeProfileId = s;
-    if (activeProfileId != null &&
-        !profiles.any((p) => p.id == activeProfileId)) {
+    if (activeProfileId != null && !profiles.any((p) => p.id == activeProfileId)) {
       activeProfileId = profiles.isNotEmpty ? profiles.first.id : null;
-      if (activeProfileId != null)
-        _prefs?.setString(_kActiveProfileKey, activeProfileId!);
+      if (activeProfileId != null) _prefs?.setString(_kActiveProfileKey, activeProfileId!);
     }
   }
 
@@ -395,21 +351,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-<<<<<<< HEAD
   String _petsKeyForProfile(String profileId) => 'pets_for_$profileId';
   String _activityKeyForProfile(String profileId) => 'activity_for_$profileId';
   String _reminderKeyForProfile(String profileId) => 'reminders_for_$profileId$_kReminderKeySuffix';
-=======
-  String petsKeyForProfile(String profileId) => 'pets_for$profileId';
-  String activityKeyForProfile(String profileId) => 'activity_for$profileId';
-  String reminderKeyForProfile(String profileId) =>
-      'reminders_for$profileId$_kReminderKeySuffix';
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
 
   Future<void> _saveProfiles() async {
     if (_prefs == null) return;
-    await _prefs!.setString(
-        _kProfilesKey, json.encode(profiles.map((p) => p.toJson()).toList()));
+    await _prefs!.setString(_kProfilesKey, json.encode(profiles.map((p) => p.toJson()).toList()));
   }
 
   Future<void> _setActiveProfile(String profileId) async {
@@ -425,8 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _savePetsForActiveProfile() async {
     if (_prefs == null || activeProfileId == null) return;
     final key = _petsKeyForProfile(activeProfileId!);
-    await _prefs!
-        .setString(key, json.encode(pets.map((p) => p.toJson()).toList()));
+    await _prefs!.setString(key, json.encode(pets.map((p) => p.toJson()).toList()));
   }
 
   Future<void> _saveActivity() async {
@@ -486,8 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _deleteProfile(String profileId) async {
-    final toRemove = profiles.firstWhere((p) => p.id == profileId,
-        orElse: () => throw StateError('not found'));
+    final toRemove = profiles.firstWhere((p) => p.id == profileId, orElse: () => throw StateError('not found'));
     await _prefs?.remove(_petsKeyForProfile(profileId));
     await _prefs?.remove(_activityKeyForProfile(profileId));
     await _prefs?.remove(_reminderKeyForProfile(profileId));
@@ -512,8 +458,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _showSnack('Removed profile "${toRemove.name}"');
   }
 
-  Future<void> _addPet(String name, String type,
-      {int? avatarColorValue, String? avatarEmoji}) async {
+  Future<void> _addPet(String name, String type, {int? avatarColorValue, String? avatarEmoji}) async {
     final now = DateTime.now();
     final pet = Pet(
       id: 'pet_${now.millisecondsSinceEpoch}',
@@ -537,15 +482,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _deletePet(String id) async {
-    final removed = pets.firstWhere((p) => p.id == id,
-        orElse: () => throw StateError('not found'));
+    final removed = pets.firstWhere((p) => p.id == id, orElse: () => throw StateError('not found'));
     pets.removeWhere((p) => p.id == id);
-<<<<<<< HEAD
     activity.insert(0, '${removed.name} removed • ${_formatRelative(DateTime.now())}');
-=======
-    activity.insert(
-        0, '${removed.name} removed • ${_formatRelative(DateTime.now())}');
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
     reminders.remove(removed.id);
     await _savePetsForActiveProfile();
     await _saveActivity();
@@ -570,19 +509,13 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(txt)));
   }
-
-  // --- Reminder UI & in-app snooze (no native notifications) ---
+ 
+  // --- Reminder UI & in-app snooze ---
   Future<void> _pickAndSaveReminder(Pet pet) async {
     final now = TimeOfDay.now();
     final picked = await showTimePicker(context: context, initialTime: now);
     if (picked == null) return;
-<<<<<<< HEAD
     final hhmm = picked.hour.toString().padLeft(2, '0') + ':' + picked.minute.toString().padLeft(2, '0');
-=======
-    final hhmm = picked.hour.toString().padLeft(2, '0') +
-        ':' +
-        picked.minute.toString().padLeft(2, '0');
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
     reminders[pet.id] = hhmm;
     await _saveReminders();
     activity.insert(0, 'Reminder set for ${pet.name} at $hhmm');
@@ -609,12 +542,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final timer = Timer(Duration(minutes: minutes), () {
       // show a snackbar when timer fires
       _showSnack('Snoozed reminder: ${pet.name} — time to check on your pet!');
-<<<<<<< HEAD
       activity.insert(0, 'Snooze fired for ${pet.name} (${minutes}m) • ${_formatRelative(DateTime.now())}');
-=======
-      activity.insert(0,
-          'Snooze fired for ${pet.name} (${minutes}m) • ${_formatRelative(DateTime.now())}');
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
       _saveActivity();
       setState(() {});
     });
@@ -644,23 +572,11 @@ class _HomeScreenState extends State<HomeScreen> {
           title: Text('Adopt a pet'),
           content: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-<<<<<<< HEAD
               TextField(decoration: InputDecoration(labelText: 'Pet name'), onChanged: (v) => name = v),
               SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: selectedType,
                 items: ['Dog', 'Cat', 'Bunny', 'Hamster'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-=======
-              TextField(
-                  decoration: InputDecoration(labelText: 'Pet name'),
-                  onChanged: (v) => name = v),
-              SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedType,
-                items: ['Dog', 'Cat', 'Bunny', 'Hamster']
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                    .toList(),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                 onChanged: (v) {
                   selectedType = v ?? selectedType;
                   selectedEmoji = _defaultEmojiForType(selectedType);
@@ -669,14 +585,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: InputDecoration(labelText: 'Pet type'),
               ),
               SizedBox(height: 12),
-<<<<<<< HEAD
               Align(alignment: Alignment.centerLeft, child: Text('Choose avatar emoji', style: TextStyle(fontWeight: FontWeight.w600))),
-=======
-              Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Choose avatar emoji',
-                      style: TextStyle(fontWeight: FontWeight.w600))),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
               SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -691,14 +600,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }).toList(),
               ),
               SizedBox(height: 12),
-<<<<<<< HEAD
               Align(alignment: Alignment.centerLeft, child: Text('Choose avatar color', style: TextStyle(fontWeight: FontWeight.w600))),
-=======
-              Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Choose avatar color',
-                      style: TextStyle(fontWeight: FontWeight.w600))),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
               SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -712,22 +614,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: BoxDecoration(
                         color: c,
                         shape: BoxShape.circle,
-<<<<<<< HEAD
                         border: isSelected ? Border.all(color: Colors.black26, width: 3) : null,
                       ),
                       child: isSelected
                           ? Icon(Icons.check, color: useWhiteForeground(c) ? Colors.white : Colors.black)
-=======
-                        border: isSelected
-                            ? Border.all(color: Colors.black26, width: 3)
-                            : null,
-                      ),
-                      child: isSelected
-                          ? Icon(Icons.check,
-                              color: useWhiteForeground(c)
-                                  ? Colors.white
-                                  : Colors.black)
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                           : null,
                     ),
                   );
@@ -736,23 +626,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ]),
           ),
           actions: [
-<<<<<<< HEAD
             TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel')),
-=======
-            TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('Cancel')),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
             ElevatedButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
                 _addPet(name, selectedType,
-<<<<<<< HEAD
                     avatarColorValue: selectedColor.value, avatarEmoji: selectedEmoji);
-=======
-                    avatarColorValue: selectedColor.value,
-                    avatarEmoji: selectedEmoji);
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
               },
               child: Text('Adopt'),
             ),
@@ -785,39 +664,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-<<<<<<< HEAD
                         color: Colors.black26, borderRadius: BorderRadius.circular(4)),
-=======
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(4)),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                   ),
                 ),
                 SizedBox(height: 12),
                 Row(children: [
                   CircleAvatar(
                       radius: 36,
-<<<<<<< HEAD
                       backgroundColor: Color(pet.avatarColorValue).withOpacity(0.18),
                       child: Text(pet.avatarEmoji, style: TextStyle(fontSize: 28))),
-=======
-                      backgroundColor:
-                          Color(pet.avatarColorValue).withOpacity(0.18),
-                      child: Text(pet.avatarEmoji,
-                          style: TextStyle(fontSize: 28))),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                   SizedBox(width: 12),
                   Expanded(
                       child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-<<<<<<< HEAD
                       Text(pet.name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-=======
-                      Text(pet.name,
-                          style: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w700)),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                       SizedBox(height: 4),
                       Text(pet.type, style: TextStyle(color: Colors.black54)),
                     ],
@@ -830,7 +691,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             context: context,
                             builder: (dctx) => AlertDialog(
                                     title: Text('Remove ${pet.name}?'),
-<<<<<<< HEAD
                                     content: Text('This will permanently remove the pet.'),
                                     actions: [
                                       TextButton(
@@ -838,18 +698,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                           child: Text('Cancel')),
                                       ElevatedButton(
                                           onPressed: () => Navigator.of(dctx).pop(true),
-=======
-                                    content: Text(
-                                        'This will permanently remove the pet.'),
-                                    actions: [
-                                      TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(dctx).pop(false),
-                                          child: Text('Cancel')),
-                                      ElevatedButton(
-                                          onPressed: () =>
-                                              Navigator.of(dctx).pop(true),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                           child: Text('Remove'))
                                     ]));
                         if (ok == true) await _deletePet(pet.id);
@@ -882,12 +730,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ElevatedButton.icon(
                       icon: Icon(Icons.alarm),
-<<<<<<< HEAD
                       label: Text(reminders.containsKey(pet.id) ? 'Edit' : 'Set'),
-=======
-                      label:
-                          Text(reminders.containsKey(pet.id) ? 'Edit' : 'Set'),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                       onPressed: () async {
                         Navigator.of(context).pop();
                         await _pickAndSaveReminder(pet);
@@ -924,12 +767,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: ElevatedButton.icon(
                           onPressed: () async {
                             pet.feed();
-<<<<<<< HEAD
                             await _updatePet(pet, actionLabel: 'Fed ${pet.name}');
-=======
-                            await _updatePet(pet,
-                                actionLabel: 'Fed ${pet.name}');
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                             Navigator.of(context).pop();
                           },
                           icon: Icon(Icons.fastfood),
@@ -939,12 +777,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: OutlinedButton.icon(
                           onPressed: () async {
                             pet.play();
-<<<<<<< HEAD
                             await _updatePet(pet, actionLabel: 'Played with ${pet.name}');
-=======
-                            await _updatePet(pet,
-                                actionLabel: 'Played with ${pet.name}');
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                             Navigator.of(context).pop();
                           },
                           icon: Icon(Icons.sports_esports),
@@ -954,12 +787,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: OutlinedButton.icon(
                           onPressed: () async {
                             pet.rest();
-<<<<<<< HEAD
                             await _updatePet(pet, actionLabel: '${pet.name} rested');
-=======
-                            await _updatePet(pet,
-                                actionLabel: '${pet.name} rested');
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                             Navigator.of(context).pop();
                           },
                           icon: Icon(Icons.hotel),
@@ -982,26 +810,15 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(label, style: TextStyle(fontWeight: FontWeight.w700)),
           if (suffixHint != null) ...[
             SizedBox(width: 6),
-<<<<<<< HEAD
             Text(suffixHint, style: TextStyle(color: Colors.black54, fontSize: 12))
-=======
-            Text(suffixHint,
-                style: TextStyle(color: Colors.black54, fontSize: 12))
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
           ]
         ]),
         SizedBox(height: 6),
         Stack(children: [
           Container(
               height: 10,
-<<<<<<< HEAD
               decoration:
                   BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(6))),
-=======
-              decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(6))),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
           FractionallySizedBox(
               widthFactor: (value.clamp(0, 100)) / 100.0,
               child: Container(
@@ -1025,13 +842,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [_profileSelector()],
       ),
       floatingActionButton: FloatingActionButton.extended(
-<<<<<<< HEAD
           onPressed: _showAdoptDialog, icon: Icon(Icons.pets), label: Text('Adopt')),
-=======
-          onPressed: _showAdoptDialog,
-          icon: Icon(Icons.pets),
-          label: Text('Adopt')),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
       body: SafeArea(
         minimum: EdgeInsets.all(12),
         child: loading
@@ -1048,13 +859,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: BoxDecoration(
                           color: Theme.of(context).cardColor,
                           borderRadius: BorderRadius.circular(12),
-<<<<<<< HEAD
                           boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)]),
-=======
-                          boxShadow: [
-                            BoxShadow(color: Colors.black12, blurRadius: 8)
-                          ]),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                       child: Row(children: [
                         CircleAvatar(
                             radius: 24,
@@ -1066,13 +871,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               _activeProfileName().isNotEmpty
                                   ? _activeProfileName()[0].toUpperCase()
                                   : '?',
-<<<<<<< HEAD
                               style:
                                   TextStyle(color: Theme.of(context).colorScheme.primary),
-=======
-                              style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                             )),
                         SizedBox(width: 12),
                         Expanded(
@@ -1088,13 +888,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     SizedBox(height: 12),
                     Expanded(
                       child: pets.isEmpty
-<<<<<<< HEAD
                           ? Center(child: Text('No pets — adopt one using the + button'))
-=======
-                          ? Center(
-                              child: Text(
-                                  'No pets — adopt one using the + button'))
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                           : ListView.builder(
                               itemCount: pets.length,
                               itemBuilder: (_, i) {
@@ -1108,24 +902,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Theme.of(context).cardColor,
                                         borderRadius: BorderRadius.circular(12),
                                         boxShadow: [
-<<<<<<< HEAD
                                           BoxShadow(color: Colors.black12, blurRadius: 8)
-=======
-                                          BoxShadow(
-                                              color: Colors.black12,
-                                              blurRadius: 8)
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                         ]),
                                     child: Row(children: [
                                       CircleAvatar(
                                           radius: 28,
                                           backgroundColor:
-<<<<<<< HEAD
                                               Color(p.avatarColorValue).withOpacity(0.14),
-=======
-                                              Color(p.avatarColorValue)
-                                                  .withOpacity(0.14),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                           child: Text(p.avatarEmoji,
                                               style: TextStyle(fontSize: 24))),
                                       SizedBox(width: 12),
@@ -1139,40 +922,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   child: Text(p.name,
                                                       style: TextStyle(
                                                           fontSize: 16,
-<<<<<<< HEAD
                                                           fontWeight:
                                                               FontWeight.w700))),
                                               Text(p.type,
                                                   style:
                                                       TextStyle(color: Colors.black54))
-=======
-                                                          fontWeight: FontWeight
-                                                              .w700))),
-                                              Text(p.type,
-                                                  style: TextStyle(
-                                                      color: Colors.black54))
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                             ]),
                                             SizedBox(height: 6),
                                             Text(
                                                 reminders.containsKey(p.id)
                                                     ? 'Reminder: ${reminders[p.id]} (in-app)'
                                                     : 'No reminder',
-<<<<<<< HEAD
                                                 style: TextStyle(color: Colors.black54))
                                           ])),
                                       IconButton(
                                           icon: Icon(Icons.access_time),
                                           onPressed: () => _pickAndSaveReminder(p)),
-=======
-                                                style: TextStyle(
-                                                    color: Colors.black54))
-                                          ])),
-                                      IconButton(
-                                          icon: Icon(Icons.access_time),
-                                          onPressed: () =>
-                                              _pickAndSaveReminder(p)),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                       PopupMenuButton<String>(
                                         onSelected: (v) async {
                                           if (v == 'feed') {
@@ -1182,56 +947,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                           } else if (v == 'play') {
                                             p.play();
                                             await _updatePet(p,
-<<<<<<< HEAD
                                                 actionLabel: 'Played with ${p.name}');
                                           } else if (v == 'rest') {
                                             p.rest();
                                             await _updatePet(p,
                                                 actionLabel: '${p.name} rested');
-=======
-                                                actionLabel:
-                                                    'Played with ${p.name}');
-                                          } else if (v == 'rest') {
-                                            p.rest();
-                                            await _updatePet(p,
-                                                actionLabel:
-                                                    '${p.name} rested');
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                           } else if (v == 'delete') {
                                             final ok = await showDialog<bool>(
                                               context: context,
                                               builder: (dctx) => AlertDialog(
-<<<<<<< HEAD
                                                 title: Text('Remove ${p.name}?'),
-=======
-                                                title:
-                                                    Text('Remove ${p.name}?'),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                                 content: Text(
                                                     'This will permanently remove the pet.'),
                                                 actions: [
                                                   TextButton(
                                                       onPressed: () =>
-<<<<<<< HEAD
                                                           Navigator.of(dctx).pop(false),
                                                       child: Text('Cancel')),
                                                   ElevatedButton(
                                                       onPressed: () =>
                                                           Navigator.of(dctx).pop(true),
-=======
-                                                          Navigator.of(dctx)
-                                                              .pop(false),
-                                                      child: Text('Cancel')),
-                                                  ElevatedButton(
-                                                      onPressed: () =>
-                                                          Navigator.of(dctx)
-                                                              .pop(true),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                                       child: Text('Remove'))
                                                 ],
                                               ),
                                             );
-<<<<<<< HEAD
                                             if (ok == true) await _deletePet(p.id);
                                           }
                                         },
@@ -1242,26 +981,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                           PopupMenuDivider(),
                                           PopupMenuItem(
                                               value: 'delete', child: Text('Delete')),
-=======
-                                            if (ok == true)
-                                              await _deletePet(p.id);
-                                          }
-                                        },
-                                        itemBuilder: (_) => [
-                                          PopupMenuItem(
-                                              value: 'feed',
-                                              child: Text('Feed')),
-                                          PopupMenuItem(
-                                              value: 'play',
-                                              child: Text('Play')),
-                                          PopupMenuItem(
-                                              value: 'rest',
-                                              child: Text('Rest')),
-                                          PopupMenuDivider(),
-                                          PopupMenuItem(
-                                              value: 'delete',
-                                              child: Text('Delete')),
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                                         ],
                                         child: Icon(Icons.more_vert),
                                       ),
@@ -1281,52 +1000,29 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
         context: context,
         builder: (_) => AlertDialog(
-<<<<<<< HEAD
             title: Text('Profile JSON snapshot'),
             content: SingleChildScrollView(child: SelectableText(s)),
             actions: [
               TextButton(
                   onPressed: () => Navigator.of(context).pop(), child: Text('Close'))
             ]));
-=======
-                title: Text('Profile JSON snapshot'),
-                content: SingleChildScrollView(child: SelectableText(s)),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text('Close'))
-                ]));
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
   }
 
   // UI helpers: profiles
   Widget _profileSelector() {
     final active = profiles.firstWhere((p) => p.id == activeProfileId,
-<<<<<<< HEAD
         orElse: () => Profile(id: 'none', name: 'No profile', createdAt: DateTime.now()));
-=======
-        orElse: () =>
-            Profile(id: 'none', name: 'No profile', createdAt: DateTime.now()));
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
     return PopupMenuButton<String>(
       tooltip: 'Profiles',
       icon: CircleAvatar(
           radius: 16,
-<<<<<<< HEAD
           backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
           child: Text(active.name.isNotEmpty ? active.name[0].toUpperCase() : '?',
-=======
-          backgroundColor:
-              Theme.of(context).colorScheme.primary.withOpacity(0.12),
-          child: Text(
-              active.name.isNotEmpty ? active.name[0].toUpperCase() : '?',
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
               style: TextStyle(color: Theme.of(context).colorScheme.primary))),
       itemBuilder: (_) {
         final items = <PopupMenuEntry<String>>[];
         if (profiles.isEmpty) {
-          items.add(
-              PopupMenuItem(child: Text('No profiles yet'), value: 'noop'));
+          items.add(PopupMenuItem(child: Text('No profiles yet'), value: 'noop'));
         } else {
           for (final p in profiles) {
             items.add(PopupMenuItem(
@@ -1336,28 +1032,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text(p.name),
                       if (p.id == activeProfileId)
-<<<<<<< HEAD
                         Icon(Icons.check, size: 18, color: Theme.of(context).colorScheme.primary)
-=======
-                        Icon(Icons.check,
-                            size: 18,
-                            color: Theme.of(context).colorScheme.primary)
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
                     ])));
           }
         }
         items.add(const PopupMenuDivider());
-<<<<<<< HEAD
         items.add(PopupMenuItem(value: 'create', child: Text('Create profile')));
         if (profiles.isNotEmpty)
           items.add(PopupMenuItem(value: 'manage', child: Text('Manage profiles')));
-=======
-        items
-            .add(PopupMenuItem(value: 'create', child: Text('Create profile')));
-        if (profiles.isNotEmpty)
-          items.add(
-              PopupMenuItem(value: 'manage', child: Text('Manage profiles')));
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
         return items;
       },
       onSelected: (v) {
@@ -1379,7 +1061,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-<<<<<<< HEAD
             title: Text('Create profile'),
             content: TextField(
                 decoration: InputDecoration(labelText: 'Profile name'),
@@ -1393,23 +1074,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   child: Text('Create'))
             ]));
-=======
-                title: Text('Create profile'),
-                content: TextField(
-                    decoration: InputDecoration(labelText: 'Profile name'),
-                    onChanged: (v) => name = v),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text('Cancel')),
-                  ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        _addProfile(name.isEmpty ? 'Profile' : name);
-                      },
-                      child: Text('Create'))
-                ]));
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
   }
 
   // ------ CORRECTED FUNCTION ---------
@@ -1512,15 +1176,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _activeProfileName() {
     final p = profiles.firstWhere((p) => p.id == activeProfileId,
-<<<<<<< HEAD
         orElse: () => Profile(id: 'none', name: 'No profile', createdAt: DateTime.now()));
     return p.name;
   }
 }
-=======
-        orElse: () =>
-            Profile(id: 'none', name: 'No profile', createdAt: DateTime.now()));
-    return p.name;
-  }
-}
->>>>>>> cc3cd644e358840f0eaa0df4f4f64cccfd3a5599
