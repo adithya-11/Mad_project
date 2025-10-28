@@ -1,37 +1,23 @@
 name: pet_care_app
-description: Pet Care App — Stage 7 (Reminders)
+description: A fun, interactive virtual pet care app.
 publish_to: "none"
-version: 0.1.0+1
+
+version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.0.0"
+  sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-
-  # persistent storage
-  shared_preferences: ^2.3.0
-
-  # date/time formatting
-  intl: ^0.18.1
-
-  # -------------------------------
-  # Optional: native local notifications
-  # (UNCOMMENT these if you want OS-level scheduled notifications;
-  #  you'll also need platform setup steps per package READMEs)
-  #
-  # flutter_local_notifications: ^18.0.1
-  # timezone: ^0.9.0
-  # flutter_native_timezone: ^2.0.0
-  #
-  # See https://pub.dev/packages/flutter_local_notifications for setup.
-  # -------------------------------
+  shared_preferences: ^2.1.1
+  intl: ^0.18.0
+  cupertino_icons: ^1.0.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^2.0.1
 
 flutter:
   uses-material-design: true
