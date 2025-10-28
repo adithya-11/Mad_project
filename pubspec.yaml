@@ -1,15 +1,33 @@
 name: pet_care_app
-description: Pet Care App — single-file, no assets (Stage 4)
+description: Pet Care App — Stage 7 (Reminders)
 publish_to: "none"
-version: 0.1.0
+version: 0.1.0+1
+
 environment:
-  sdk: ">=2.18.0 <4.0.0"
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  shared_preferences: ^2.1.0
-  flutter_colorpicker: ^1.0.3
+
+  # persistent storage
+  shared_preferences: ^2.3.0
+
+  # date/time formatting
+  intl: ^0.18.1
+
+  # -------------------------------
+  # Optional: native local notifications
+  # (UNCOMMENT these if you want OS-level scheduled notifications;
+  #  you'll also need platform setup steps per package READMEs)
+  #
+  # flutter_local_notifications: ^18.0.1
+  # timezone: ^0.9.0
+  # flutter_native_timezone: ^2.0.0
+  #
+  # See https://pub.dev/packages/flutter_local_notifications for setup.
+  # -------------------------------
 
 dev_dependencies:
   flutter_test:
